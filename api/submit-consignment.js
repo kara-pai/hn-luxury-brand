@@ -43,6 +43,7 @@ export default async function handler(req, res) {
 async function saveCustomerToCRM(consignor, refNumber, items) {
   try {
     // Prepare customer data for N8N Airtable workflow
+    const totalValue = items.reduce((sum, item) => sum + (parseFloat(item.value) * parseFloat(item.qty)), 0);
     const customerData = {
       customer: {
         fullName: consignor.name,
@@ -52,16 +53,20 @@ async function saveCustomerToCRM(consignor, refNumber, items) {
         suburb: consignor.suburb,
         postcode: consignor.postcode,
         abn: consignor.abn || null,
-        commission: consignor.commission || 0,
-        period: consignor.period || 0,
-        totalValue: items.reduce((sum, item) => sum + (parseFloat(item.value) * parseFloat(item.qty)), 0)
+        commission: parseFloat(consignor.commission) || 0,
+        period: parseInt(consignor.period) || 0,
+        totalValue: totalValue
       },
       items: items.map(item => ({
         description: item.description,
-        value: item.value,
+        value: parseFloat(item.value),
+        qty: parseInt(item.qty),
         action: 'consignment',
         reference: refNumber
       })),
+      commission: parseFloat(consignor.commission) || 0,
+      period: parseInt(consignor.period) || 0,
+      totalValue: totalValue,
       action: 'consignment',
       reference: refNumber,
       webhookUrl: 'https://n8n.srv1422365.hstgr.cloud/webhook/hn-luxury-capture',

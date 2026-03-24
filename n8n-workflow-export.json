@@ -1,0 +1,113 @@
+{
+  "name": "HN Luxury Consignment Capture",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "hn-luxury-capture",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "responseData": "autodetect"
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "baseId": "app7X0jQ5wwXvbiTO",
+        "tableId": {
+          "mode": "list",
+          "value": "Customers"
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Name",
+              "fieldValue": "={{ $json.customer.fullName }}"
+            },
+            {
+              "fieldName": "Email",
+              "fieldValue": "={{ $json.customer.email }}"
+            },
+            {
+              "fieldName": "Phone",
+              "fieldValue": "={{ $json.customer.phone }}"
+            },
+            {
+              "fieldName": "Address",
+              "fieldValue": "={{ $json.customer.address }}"
+            },
+            {
+              "fieldName": "Suburb",
+              "fieldValue": "={{ $json.customer.suburb }}"
+            },
+            {
+              "fieldName": "Postcode",
+              "fieldValue": "={{ $json.customer.postcode }}"
+            },
+            {
+              "fieldName": "ABN",
+              "fieldValue": "={{ $json.customer.abn }}"
+            },
+            {
+              "fieldName": "Commission %",
+              "fieldValue": "={{ $json.commission }}"
+            },
+            {
+              "fieldName": "Period (Days)",
+              "fieldValue": "={{ $json.period }}"
+            },
+            {
+              "fieldName": "Total Value",
+              "fieldValue": "={{ $json.totalValue }}"
+            },
+            {
+              "fieldName": "Items",
+              "fieldValue": "={{ JSON.stringify($json.items) }}"
+            },
+            {
+              "fieldName": "Action",
+              "fieldValue": "={{ $json.action }}"
+            },
+            {
+              "fieldName": "Reference",
+              "fieldValue": "={{ $json.reference }}"
+            }
+          ]
+        }
+      },
+      "id": "airtable-create",
+      "name": "Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "credentials": {
+        "airtableApi": {
+          "id": "airtable-cred-hn-luxury",
+          "name": "Airtable (HN Luxury)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
