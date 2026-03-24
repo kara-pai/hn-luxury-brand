@@ -3,6 +3,10 @@
   "buildCommand": "",
   "public": true,
   "functions": {
+    "api/capture-print.js": {
+      "memory": 512,
+      "maxDuration": 30
+    },
     "api/submit-consignment.js": {
       "memory": 1024,
       "maxDuration": 60

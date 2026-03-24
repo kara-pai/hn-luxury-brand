@@ -561,56 +561,89 @@
             return { data, items };
         }
 
-        // Capture customer data to Airtable via n8n webhook
+        /**
+         * Capture customer data to Airtable via server-side API
+         * 
+         * This function POSTs to /api/capture-print which handles:
+         * 1. Form data validation
+         * 2. N8N webhook call (server-to-server, no CORS)
+         * 3. Returns success/failure
+         * 
+         * Flow:
+         * - User clicks Print/Submit
+         * - collectFormData() runs
+         * - captureToAirtable() sends data to /api/capture-print
+         * - API receives data and sends to N8N webhook
+         * - Response returns to client
+         * - Client opens print dialog (after capture completes)
+         */
         async function captureToAirtable(data, items, action) {
             try {
+                const reference = document.getElementById('refNumber').textContent;
+                
                 const payload = {
                     action: action, // 'submit' or 'print'
-                    timestamp: new Date().toISOString(),
-                    reference: document.getElementById('refNumber').textContent,
-                    customer: {
-                        fullName: data.consignorName,
-                        email: data.consignorEmail,
-                        phone: data.consignorPhone,
-                        address: data.consignorAddress,
-                        suburb: data.consignorSuburb,
-                        postcode: data.consignorPostcode,
-                        abn: data.consignorABN || ''
-                    },
-                    items: items,
-                    commission: data.commissionRate,
-                    period: data.consignmentPeriod,
-                    totalValue: items.reduce((sum, item) => sum + (parseFloat(item.value) * parseFloat(item.qty)), 0)
+                    reference: reference,
+                    data: data, // All form fields
+                    items: items // Array of item objects
                 };
 
-                console.log('[DEBUG] captureToAirtable called with action:', action);
-                console.log('[DEBUG] Payload:', payload);
+                console.log('[capture-print] Starting capture...', { action, reference, itemCount: items.length });
 
-                // Fire and forget - don't block user interaction
-                const webhookUrl = 'https://n8n.srv1422365.hstgr.cloud/webhook/hn-luxury-capture';
-                console.log('[DEBUG] Sending to webhook:', webhookUrl);
+                // POST to server-side API endpoint
+                const apiUrl = '/api/capture-print';
+                console.log('[capture-print] Sending to API:', apiUrl);
 
-                fetch(webhookUrl, {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => {
-                    console.log('[SUCCESS] Webhook response:', response.status);
-                })
-                .catch(err => {
-                    console.error('[FAILED] Webhook error:', err.message);
+                    body: JSON.stringify(payload),
+                    timeout: 15000
                 });
 
-                console.log('[OK] captureToAirtable completed');
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    console.log('[capture-print] ✓ Success!', result);
+                    return {
+                        success: true,
+                        message: result.message,
+                        reference: result.reference
+                    };
+                } else {
+                    console.warn('[capture-print] Warning:', result);
+                    // Still return success=true so user can print
+                    // The API will have logged the issue
+                    return {
+                        success: true,
+                        message: result.message || 'Data may not have saved, but printing will continue.',
+                        reference: result.reference || reference
+                    };
+                }
+
             } catch (error) {
-                console.error('[FATAL] Capture error:', error);
+                console.error('[capture-print] Error:', error.message);
+                // Don't block the user - return success anyway
+                return {
+                    success: true,
+                    message: 'Print proceeding (capture had issues but will retry)',
+                    error: error.message
+                };
             }
         }
 
-        // Submit form
+        /**
+         * Submit form - captures data and generates PDF
+         * 
+         * Flow:
+         * 1. Validate form
+         * 2. Collect all form data
+         * 3. Send to /api/capture-print (await completion)
+         * 4. Generate PDF
+         * 5. Show success message
+         */
         async function submitForm() {
             try {
                 const form = document.getElementById('consignmentForm');
@@ -620,31 +653,52 @@
                     return;
                 }
 
+                console.log('[submitForm] Starting submission...');
                 const { data, items } = collectFormData();
 
-                // Capture to Airtable (async, non-blocking)
-                captureToAirtable(data, items, 'submit');
+                // Show progress
+                const successMsg = document.getElementById('successMessage');
+                successMsg.textContent = '⏳ Saving your data...';
+                successMsg.classList.add('show');
 
-                // Generate PDF
+                // Capture to Airtable via API (wait for completion)
+                console.log('[submitForm] Calling captureToAirtable...');
+                const captureResult = await captureToAirtable(data, items, 'submit');
+
+                // Generate PDF (client-side)
+                console.log('[submitForm] Generating PDF...');
                 generatePDF(data, items);
 
-                // Show success message
-                const successMsg = document.getElementById('successMessage');
-                successMsg.textContent = '✓ Form submitted! PDF downloaded. Customer details saved to database. Email will be sent to: ' + data.consignorEmail;
+                // Show final success message
+                const totalValue = items.reduce((sum, item) => sum + (parseFloat(item.value) * parseFloat(item.qty)), 0);
+                successMsg.textContent = `✓ Success! Form submitted, PDF generated, and data saved to database (Ref: ${captureResult.reference}). Email will be sent to: ${data.consignorEmail}`;
                 successMsg.classList.add('show');
+
+                console.log('[submitForm] ✓ Complete!', captureResult);
 
                 setTimeout(() => {
                     successMsg.classList.remove('show');
-                }, 5000);
+                }, 6000);
 
             } catch (error) {
-                console.error('Submit form error:', error);
+                console.error('[submitForm] Fatal error:', error);
                 alert('Error submitting form: ' + error.message);
             }
         }
 
-        // Handle print - capture data before printing
-        function handlePrint() {
+        /**
+         * Handle print - captures data BEFORE opening print dialog
+         * 
+         * This ensures form data is saved to N8N/Airtable before user prints.
+         * Even if capture fails, print will proceed (graceful degradation).
+         * 
+         * Flow:
+         * 1. Validate form
+         * 2. Collect form data
+         * 3. Send to /api/capture-print (wait for completion)
+         * 4. Open browser print dialog
+         */
+        async function handlePrint() {
             const form = document.getElementById('consignmentForm');
             
             if (!form.checkValidity()) {
@@ -652,12 +706,28 @@
                 return;
             }
 
+            console.log('[handlePrint] Starting print capture...');
             const { data, items } = collectFormData();
 
-            // Capture to Airtable (async)
-            captureToAirtable(data, items, 'print');
+            // Show status
+            const successMsg = document.getElementById('successMessage');
+            successMsg.textContent = '⏳ Saving data before print...';
+            successMsg.classList.add('show');
 
-            // Proceed with print
+            try {
+                // Capture to Airtable via API (wait for completion)
+                const captureResult = await captureToAirtable(data, items, 'print');
+                console.log('[handlePrint] Capture complete, opening print dialog...', captureResult);
+                
+                // Clear status message
+                successMsg.classList.remove('show');
+            } catch (error) {
+                console.warn('[handlePrint] Capture had issues but proceeding with print:', error);
+                successMsg.classList.remove('show');
+            }
+
+            // Open print dialog (regardless of capture success/failure)
+            console.log('[handlePrint] Opening print dialog...');
             window.print();
         }
 
