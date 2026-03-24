@@ -583,16 +583,29 @@
                     totalValue: items.reduce((sum, item) => sum + (parseFloat(item.value) * parseFloat(item.qty)), 0)
                 };
 
+                console.log('[DEBUG] Sending payload to N8N:', payload);
+
                 // Fire and forget - don't block user interaction
                 fetch('https://n8n.srv1422365.hstgr.cloud/webhook/hn-luxury-capture', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).catch(err => console.log('[Airtable Sync] Running in background...'));
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                    mode: 'no-cors'
+                })
+                .then(response => {
+                    console.log('[DEBUG] Webhook response status:', response.status);
+                    return response;
+                })
+                .catch(err => {
+                    console.error('[ERROR] Webhook call failed:', err);
+                });
 
-                console.log('✓ Customer data will be saved to Airtable');
+                console.log('✓ Customer data sent to Airtable (async)');
             } catch (error) {
-                console.error('Capture error:', error);
+                console.error('[FATAL] Capture error:', error);
             }
         }
 
