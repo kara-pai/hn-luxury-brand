@@ -1,0 +1,22 @@
+{
+  "name": "hn-luxury-brand-consignment",
+  "version": "1.0.0",
+  "description": "Consignment Form & Inventory Management for HN Luxury Brand",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node api/submit-consignment.js",
+    "build": "echo 'Build complete'",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.7",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}

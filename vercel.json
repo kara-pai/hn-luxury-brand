@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "buildCommand": "",
+  "public": true,
+  "functions": {
+    "api/submit-consignment.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" }
+  ]
+}
